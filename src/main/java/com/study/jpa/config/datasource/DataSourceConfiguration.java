@@ -40,7 +40,7 @@ public class DataSourceConfiguration {
         LocalContainerEntityManagerFactoryBean em
                 = new LocalContainerEntityManagerFactoryBean();
         em.setDataSource(basicDataSource());
-        em.setPackagesToScan(new String[] { "com.study.jpa.v1.entity" });
+        em.setPackagesToScan(new String[] { "com.study.jpa.ch1.v1.entity" });
         em.setPersistenceUnitName("basic"); // db 별로 이름을 세팅한다.
 
         HibernateJpaVendorAdapter vendorAdapter
