@@ -17,7 +17,6 @@ import javax.sql.DataSource;
 import java.util.HashMap;
 
 @Configuration
-//@PropertySource({"classpath:persistence-multiple-db-boot.properties"})
 @EnableJpaRepositories(
         basePackages = "com.study.jpa",
         entityManagerFactoryRef = "basicEntityManager",
