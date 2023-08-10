@@ -137,3 +137,84 @@ public class CustomizedUserRepositoryImpl implements CustomizedUserRepository{
 public interface UserRepositoryV4 extends JpaRepository<UserV1, Long>, CustomizedUserRepository {
 }
 ~~~
+
+
+#### isNew()
+엔티티를 저장하는 `save()`의 코드를 살펴보자.  
+`isNew()` 메서드로 판단하여 `true`이면 `persist()`를 호출하고, `false`이면 `merge()`를 호출한다.  
+`persist()`와 `merge()`의 차이는 [여기](https://github.com/outgrow0905/study-jpa/blob/4efc575b1caf387e0969b3baa62de71ee3524b12/src/main/java/com/study/jpa/ch1/description/5_merge.md#merge)서 참고하자.    
+`isNew()`의 대략적인 로직은 영속성 컨텍스트에서 `키`값이 있는지 여부이다.  
+
+그래서 아래의 로직이 어떤 영향이 있는것일까?  
+엔티티에서 키값에 `@GeneratedValue`가 있는지 여부가 영향을 미칠 수 있다.  
+
+`@GeneratedValue`가 있는 경우,  
+`save()`시점에 키값이 없다. 따라서 `isNew()`를 `true`로 판단하여 바로 `persist()`를 수행한다.  
+
+`@GeneratedValue`가 없는 경우,  
+`save()`시점에 키값이 있다. 따라서 처음 등록함에도 불구하고 무조건 데이터베이스에서 `select`를 한번 수행한다.  
+키값으로 조회하기 때문에 크게 지연은 안되겠지만 어쨋든 불필요한 작업임에는 틀림없다.  
+
+~~~java
+@Transactional
+@Override
+public <S extends T> S save(S entity) {
+    Assert.notNull(entity, "Entity must not be null");
+    
+    if (entityInformation.isNew(entity)) {
+        em.persist(entity);
+        return entity;
+    } else {
+        return em.merge(entity);
+    }
+}
+~~~
+
+그럼 어떻게 개선할 수 있을까?  
+`isNew()`를 개발자가 직접 정의할 수 있다.  
+`@Id`가 붙어있는 키값의 여부로 판단하지 말고 다른 로직으로 판단하게 할 수 있는 것이다.  
+
+예를 들어, `생성시점(createdTime)` 컬럼이 있다고 가정해보자.  
+이 컬럼은 `save()`시점에 무조건 있어야 하는 값이다.  
+그리고 이 값은 `jpa`에서 자동으로 주입하도록 할 수 있다.  
+
+~~~java
+@Entity
+@EntityListeners(AuditingEntityListener.class) // 추가
+public class UserV2 extends BaseEntityV1 {
+    @Id
+    @Column(name = "USER_ID")
+    private Long id;
+    private String name;
+    private AddressV1 address;
+
+    @CreatedDate // 추가
+    private LocalDateTime createdTime;
+}
+
+@EnableJpaAuditing // 추가
+@SpringBootApplication 
+public class StudySpringJpaApplication {
+    ...
+}
+~~~
+
+새로 `추가`한 설정을 통해 해당 엔티티는 등록시점에 `createdTime`이 자동으로 부여된다.  
+그러면 이제 마지막으로 `isNew()`의 로직을 `createTime`의 여부를 보도록 변경하면 된다.  
+마지 `@GeneratedValue`가 있는 엔티티에서 자동으로 할당되는 `키`값을 기준으로 판단하듯이,  
+`@GeneratedValue`가 없는 엔티티에서 자동으로 할당되는 `다른 데이터 (createdTime)`을 기준으로 판단하도록 변경하는 것이다.
+
+아래와 같이 `Persistable`를 상속하고 `isNew()`를 재정의하자.  
+테스트를 수행하여 `insert` 이전에 불필요한 `select`를 수행하지 않는것을 확인하면 성공이다.  
+
+~~~java
+...
+public class UserV2 extends BaseEntityV1 implements Persistable<Long> {
+    ...
+
+    @Override
+    public boolean isNew() {
+        return createdTime == null;
+    }
+}
+~~~

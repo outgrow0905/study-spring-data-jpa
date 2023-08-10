@@ -6,6 +6,8 @@ import com.study.jpa.ch1.v1.repository.UserRepositoryV1;
 import com.study.jpa.ch1.v2.UserRepositoryV2;
 import com.study.jpa.ch1.v3.UserRepositoryV3;
 import com.study.jpa.ch1.v4.UserRepositoryV4;
+import com.study.jpa.ch1.v5.entity.UserV2;
+import com.study.jpa.ch1.v5.repository.UserRepositoryV5;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,9 @@ class SpringDataJpaTest {
 
     @Autowired
     private UserRepositoryV4 userRepositoryV4;
+
+    @Autowired
+    private UserRepositoryV5 userRepositoryV5;
 
     @Test
     void queryMethod1() {
@@ -88,5 +93,22 @@ class SpringDataJpaTest {
         UserV1 user = new UserV1();
         user.setName("name1");
         userRepositoryV4.customMethod(user);
+    }
+
+    @Test
+    void save1() {
+        UserV1 user1 = new UserV1();
+        user1.setName("name1");
+        userRepositoryV4.save(user1);
+    }
+
+    @Test
+    void save2() {
+        UserV2 user1 = new UserV2();
+        user1.setId(1L);
+        user1.setName("name1");
+        userRepositoryV5.save(user1);
+
+        userRepositoryV5.deleteAll();
     }
 }
