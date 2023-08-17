@@ -31,8 +31,32 @@ dependencies {
 
     // parameter bind
     implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0'
+
+    // querydsl
+    implementation("com.querydsl:querydsl-jpa:${dependencyManagement.importedProperties["querydsl.version"]}:jakarta")
+    annotationProcessor("com.querydsl:querydsl-apt:${dependencyManagement.importedProperties["querydsl.version"]}:jakarta")
+    annotationProcessor("jakarta.persistence:jakarta.persistence-api")
+    annotationProcessor("jakarta.annotation:jakarta.annotation-api")
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+def querydslDir = "$buildDir/generated/querydsl"
+
+sourceSets { // gradle build 시, QClass도 같이 build
+    main {
+        java {
+            srcDirs += [ querydslDir ]
+        }
+    }
+}
+
+tasks.withType(JavaCompile) { // complilJava시, QClass를 querydslDir에 저장한다. (Gradle > build > compileJava)
+    options.generatedSourceOutputDirectory = file(querydslDir)
+}
+
+clean { // gradle clean 시에 querydslDir의 파일을 전부 삭제한다. (Gradle > build > clean)
+    delete file(querydslDir)
 }
