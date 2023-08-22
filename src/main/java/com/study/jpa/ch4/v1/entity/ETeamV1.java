@@ -2,16 +2,16 @@ package com.study.jpa.ch4.v1.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.OneToMany;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Entity
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
 public class ETeamV1 {
     @Id
@@ -19,6 +19,11 @@ public class ETeamV1 {
 
     private String name;
 
-    @ManyToOne
-    private EMemberV1 member;
+    @OneToMany(mappedBy = "team")
+    private List<EMemberV1> members;
+
+    public ETeamV1(Long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
 }

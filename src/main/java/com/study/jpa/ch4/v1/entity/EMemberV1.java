@@ -1,13 +1,13 @@
 package com.study.jpa.ch4.v1.entity;
 
+import com.study.jpa.ch4.v1.converter.BooleanToYnConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
-import java.util.*;
 
 @Entity
 @Setter
@@ -19,14 +19,15 @@ public class EMemberV1 {
 
     private String name;
 
-    @OneToMany(mappedBy = "member")
-    Set<ETeamV1> teams = new HashSet<>();
+    @Convert(converter = BooleanToYnConverter.class)
+    private boolean vip;
 
-    @OneToMany(mappedBy = "member")
-    List<ETeamV1> teamList = new ArrayList<>();
+    @ManyToOne
+    private ETeamV1 team;
 
-    public EMemberV1(Long id, String name) {
+    public EMemberV1(Long id, String name, boolean vip) {
         this.id = id;
         this.name = name;
+        this.vip = vip;
     }
 }
