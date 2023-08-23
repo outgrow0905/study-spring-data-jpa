@@ -1,17 +1,17 @@
 package com.study.jpa.ch4.v1.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 
 @Entity
 @Getter
 @Setter
+@Slf4j
 @NoArgsConstructor
 public class ETeamV1 {
     @Id
