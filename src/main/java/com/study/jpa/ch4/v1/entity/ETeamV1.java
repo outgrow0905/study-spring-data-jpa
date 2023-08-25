@@ -15,9 +15,12 @@ import java.util.List;
 @NoArgsConstructor
 public class ETeamV1 {
     @Id
+//    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String name;
+
+    private String address;
 
     @OneToMany(mappedBy = "team")
     private List<EMemberV1> members;
@@ -25,5 +28,18 @@ public class ETeamV1 {
     public ETeamV1(Long id, String name) {
         this.id = id;
         this.name = name;
+    }
+
+    public ETeamV1(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public String toString() {
+        return "ETeamV1{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", address='" + address + '\'' +
+                '}';
     }
 }

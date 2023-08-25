@@ -22,7 +22,11 @@ class ListenerTest {
 
     @Test
     void listener2() {
-        EComputerV1 computer = eComputerRepositoryV1.findById(12L).get();
+        EComputerV1 computer = new EComputerV1();
+        computer.setName("computer name1");
+        eComputerRepositoryV1.save(computer);
+
+        EComputerV1 findComputer = eComputerRepositoryV1.findById(computer.getId()).get();
         computer.setName("computer name2");
         eComputerRepositoryV1.save(computer);
     }
