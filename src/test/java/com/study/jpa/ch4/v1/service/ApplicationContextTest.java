@@ -1,5 +1,6 @@
 package com.study.jpa.ch4.v1.service;
 
+import com.study.jpa.ch4.v1.entity.EComputerV1;
 import com.study.jpa.ch4.v1.entity.ETeamV1;
 import com.study.jpa.ch4.v1.repository.EComputerRepositoryV1;
 import com.study.jpa.ch4.v1.repository.ETeamRepositoryV1;
@@ -17,10 +18,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 @Slf4j
 @SpringBootTest
 class ApplicationContextTest {
-    @Autowired
-    private ETeamServiceV1 eTeamServiceV1;
+
     @Autowired
     private ETeamRepositoryV1 eTeamRepositoryV1;
+
+    @Autowired
+    private EComputerServiceV1 eComputerServiceV1;
 
     @Autowired
     private EComputerRepositoryV1 eComputerRepositoryV1;
@@ -65,5 +68,34 @@ class ApplicationContextTest {
 //        // then
 //        ETeamV1 findTeam = eTeamRepositoryV1.findById(savedTeam.getId()).get();
 //        assertSame(team1, findTeam); // same
+    }
+
+    @Test
+    @Transactional
+    void compareEntity4() {
+        // given
+        EComputerV1 computer1 = new EComputerV1();
+        computer1.setName("computer name1");
+
+        // when
+        eComputerServiceV1.saveComputer(computer1);
+
+        // then
+        EComputerV1 findComputer = eComputerRepositoryV1.findById(computer1.getId()).get();
+        assertSame(computer1, findComputer); // same
+    }
+
+    @Test
+    void compareEntity5() {
+        // given
+        EComputerV1 computer1 = new EComputerV1();
+        computer1.setName("computer name1");
+
+        // when
+        eComputerServiceV1.saveComputer(computer1);
+
+        // then
+        EComputerV1 findComputer = eComputerRepositoryV1.findById(computer1.getId()).get();
+        assertNotSame(computer1, findComputer); // not same
     }
 }
