@@ -1,4 +1,4 @@
-#### 영속성 컨텍스트와 엔티티 비교
+#### 영속성 컨텍스트와 프록시 비교
 영속성 컨텍스트 내에서 엔티티 비교를 심화적으로 알아보자.  
 예시에 사용할 간단한 엔티티는 아래와 같다.
 
@@ -100,3 +100,89 @@ void compareEntity5() {
 마치 서로다른 `map`에 같은 `키`값으로 객체를 보관하고 동등성비교를 하는것과 같은 꼴이다.  
 따라서 `compareEntity5` 테스트코드는 `not same`하게 되는 것이다.
 
+
+
+#### 영속성 컨텍스트와 프록시 비교  
+심화과정이니 프록시비교도 해보자.  
+여기서 프록시는 jpa에서 엔티티 조회시에 (주로) 성능상 이점을 위해 실제 데이터가 사용되기 전까지 프록시로 보관하여 조회를 뒤로 미루는 것을 의미한다.  
+
+테스트코드로 바로 넘어가보자.  
+
+~~~java
+@Test
+@Transactional
+void compareProxy1() {
+    // save
+    EComputerV1 computer1 = new EComputerV1();
+    computer1.setName("computer name1");
+    eComputerRepositoryV1.save(computer1);
+
+    // clear persistence context
+    entityManager.clear();
+
+    // compare
+    EComputerV1 referenceComputer = eComputerRepositoryV1.getReferenceById(computer1.getId());
+    EComputerV1 findComputer = eComputerRepositoryV1.findById(computer1.getId()).get();
+    log.info("referenceComputer class: {}", referenceComputer.getClass()); // EComputerV1$HibernateProxy$Op3s5H31
+    log.info("findComputer class: {}", findComputer.getClass()); // EComputerV1$HibernateProxy$Op3s5H31
+}
+~~~
+
+일단 기본적으로 `@Transactional`은 붙여두었다. 붙이지 않으면 `getReferenceById()`, `findById()` 실행시에 각각 영속성 컨텍스트를 생성, 종료하기 때문이다.  
+
+위의 코드에서 `referenceComputer`는 프록시이고 `findComputer`는 원본 엔티티이다. 둘은 엄연히 다르다.    
+하지만 로그에서는 둘 다 프록시로 찍힌다.  
+이유는 동일한 영속성 컨텍스트 내에서 엔티티의 동일성을 보장해야 하기 때문이다.  
+로그에는 심지어 `findById()` 시점에 `select sql`도 실행된다. 하지만 이미 `referenceComputer`가 프록시상태로 영속성 컨텍스트에 등록되어있기 때문에 이를 적용하지 않고 프록시로 등록한다.  
+
+그렇다면 순서를 바꿔서 실행하면 어떨까?  
+
+~~~java
+@Test
+@Transactional
+void compareProxy2() {
+    // save
+    EComputerV1 computer1 = new EComputerV1();
+    computer1.setName("computer name1");
+    eComputerRepositoryV1.save(computer1);
+
+    // clear persistence context
+    entityManager.clear();
+
+    // compare
+    EComputerV1 findComputer = eComputerRepositoryV1.findById(computer1.getId()).get();
+    EComputerV1 referenceComputer = eComputerRepositoryV1.getReferenceById(computer1.getId());
+    log.info("findComputer class: {}", findComputer.getClass()); // class com.study.jpa.ch4.v1.entity.EComputerV1
+    log.info("referenceComputer class: {}", referenceComputer.getClass()); // class com.study.jpa.ch4.v1.entity.EComputerV1
+}
+~~~
+
+이번에는 `findById()`가 먼저이기 때문에 영속성 컨텍스트에는 프록시가 아닌 엔티티가 먼저 등록된다.  
+그렇다면 `getReferenceById()` 시점에는 이미 영속성 컨텍스트에 엔티티가 있는데 굳이 프록시로 반환할 이유가 없게된다.  
+따라서 로그에는 둘 다 엔티티 클레스로 찍히게 된다.  
+
+
+
+#### 프록시 타입비교
+추가로 프록시의 타입을 비교시에 주의할 부분을 알아보자.  
+프록시는 실제 엔티티 클래스를 상속받아 생성되는 클래스이다.  
+따라서 둘의 클래스 비교시에는 아래와 같이 비교해야 한다.  
+
+~~~java
+@Test
+void compareProxy3() {
+    // save
+    EComputerV1 computer1 = new EComputerV1();
+    computer1.setName("computer name1");
+    eComputerRepositoryV1.save(computer1);
+
+    // clear persistence context
+    entityManager.clear();
+
+    // compare
+    EComputerV1 referenceComputer = eComputerRepositoryV1.getReferenceById(computer1.getId());
+
+    assertNotSame(EComputerV1.class, referenceComputer.getClass()); // not same
+    assertTrue(referenceComputer instanceof EComputerV1); // use instanceof
+}
+~~~
