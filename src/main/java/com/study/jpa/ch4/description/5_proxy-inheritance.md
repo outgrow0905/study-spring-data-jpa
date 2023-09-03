@@ -94,15 +94,54 @@ void inheritance3() {
 }
 ~~~
 
-가장 쉽게 꺼낼 수 있지만 이방법의 주의할 점은 `assertNotSame(item, book);` 이 통과한다는 것이다.  
+가장 쉽게 꺼낼 수 있지만 이 방법의 주의할 점은 `assertNotSame(item, book);` 이 통과한다는 것이다.  
 이 의미는 영속성 컨텍스트에 `item, book`이 둘 다 등록되어있는 상태를 의미하기도 한다.  
-(실제로 `book`의 데이터를 변경하면 jpa의 `변경감지기능`이 동작한다.)  
+(실제로 `item, book`의 데이터를 변경하면 jpa의 `변경감지기능`이 둘 다 각각 동작한다.)  
 같은 키값을 가지고 있는데 다른 객체이니 영속성컨텍스트에 불안정하게 둘 다 등록될 수 있는 것이다.  
 영속성 컨텍스트 입장에서는 키값이 같은 (ex. `id=1`)의 서로다른 두 객체를 보관하고 있을 뿐이다.  
 따라서 `Hibernate.unproxy()` 기능은 원본 엔티티가 꼭 필요한 곳에서만 잠깐 사용하도록 하는것이 좋다.
 
 
 ##### 별도 인터페이스 제공
+상속한 구체적인 엔티티로 형변환해야 할 필요는 상속한 엔티티만 가지고 있는 정보를 조회해야 할 경우가 많을 것이다.  
+그렇다면 인터페이스를 이용해볼 수 있다.  
+
+~~~java
+public interface TitleView {
+    String getView();
+}
+
+public abstract class ItemV2 implements TitleView{
+    ...
+}
+
+@Entity
+@DiscriminatorValue("A")
+public class AlbumV2 extends ItemV2 {
+    ...
+    
+    @Override
+    public String getView() {
+        return "AlbumV2{" +
+                "artist='" + artist + '\'' +
+                ", etc='" + etc + '\'' +
+                '}';
+    }
+}
+
+@Entity
+public class OrderItemV2 extends BaseEntityV1 {
+    ...
+    
+    public void printTitleView() {
+        log.info("view: {}", item.getView());
+    }
+}
+~~~
+
+`Item`은 `TitleView`를 구현하였고, `Item`을 상속한 세 클래스는 각각의 클래스만 가지고 있는 고유한 정보들을 조회하도록 `getView()`를 구현하였다.  
+그리고 중요한 부분은 `OrderItem`의 ```printTitleView()```에서 인터페이스를 통해 사용하는 부분이다.  
+이렇게 된다면 구체클래스 예를 들어, `Album`에서 새로운 데이터가 추가되어도 `OrderItem`의 `printTitleView()`를 전혀 변경하지 않아도 되는 좋은 확장성을 가져갈 수 있다.
 
 
 
