@@ -10,6 +10,12 @@ import com.study.jpa.ch4.v2.entity.ItemV2;
 import com.study.jpa.ch4.v2.entity.OrderItemV2;
 import com.study.jpa.ch4.v2.repository.BookRepositoryV2;
 import com.study.jpa.ch4.v2.repository.OrderItemRepositoryV2;
+import com.study.jpa.ch4.v3.entity.BookV3;
+import com.study.jpa.ch4.v3.entity.ItemV3;
+import com.study.jpa.ch4.v3.entity.OrderItemV3;
+import com.study.jpa.ch4.v3.repository.BookRepositoryV3;
+import com.study.jpa.ch4.v3.repository.OrderItemRepositoryV3;
+import com.study.jpa.ch4.v3.visitor.VisitorImpl1;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +42,12 @@ class ProxyInheritanceTest {
 
     @Autowired
     private OrderItemRepositoryV2 orderItemRepositoryV2;
+
+    @Autowired
+    private BookRepositoryV3 bookRepositoryV3;
+
+    @Autowired
+    private OrderItemRepositoryV3 orderItemRepositoryV3;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -145,5 +157,26 @@ class ProxyInheritanceTest {
         ItemV2 item = orderItem.getItem(); // lazy load
         String bookView = item.getView();
         log.info("book view: {}", bookView);
+    }
+
+    @Test
+    @Transactional
+    void inheritance5() {
+        // save
+        BookV3 saveBook = new BookV3();
+        saveBook.setName("book name1");
+        saveBook.setAuthor("book author1");
+        bookRepositoryV3.save(saveBook);
+
+        OrderItemV3 saveOrderItem = new OrderItemV3();
+        saveOrderItem.setItem(saveBook);
+        orderItemRepositoryV3.save(saveOrderItem);
+
+        // clear persistence context
+        entityManager.clear();
+
+        OrderItemV3 orderItem = orderItemRepositoryV3.findById(saveOrderItem.getId()).get();
+        ItemV3 item = orderItem.getItem(); // lazy load
+        item.accept(new VisitorImpl1());
     }
 }

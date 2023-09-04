@@ -146,3 +146,93 @@ public class OrderItemV2 extends BaseEntityV1 {
 
 
 ##### visitor pattern
+위의 방법에서 `Item`이 특정 인터페이스를 상속하지 않게 하면서 문제를 해결해보자.  
+`visitor pattern`을 이용해볼 것이다.
+
+`visitor` 부터 만들어보자.
+~~~java
+public interface Visitor {
+    void visit(AlbumV3 album);
+    void visit(BookV3 book);
+    void visit(MovieV3 movie);
+}
+
+public class VisitorImpl1 implements Visitor{
+    @Override
+    public void visit(AlbumV3 album) {
+        // album logic1...
+    }
+
+    @Override
+    public void visit(BookV3 book) {
+        // book logic1...
+    }
+
+    @Override
+    public void visit(MovieV3 movie) {
+        // movie logic1...
+    }
+}
+
+public class VisitorImpl2 implements Visitor{
+    @Override
+    public void visit(AlbumV3 album) {
+        // album logic2...
+    }
+
+    @Override
+    public void visit(BookV3 book) {
+        // book logic2...
+    }
+
+    @Override
+    public void visit(MovieV3 movie) {
+        // movie logic2...
+    }
+}
+~~~
+
+이제 `visitor`를 받을수 있도록 기존 엔티티들에 반영해보자.
+
+~~~java
+@Entity
+@DiscriminatorColumn(name = "DTYPE")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+public abstract class ItemV3 implements TitleView {
+    ...
+    abstract void visit(Visitor visitor);
+}
+
+@Entity
+@DiscriminatorValue("A")
+public class AlbumV3 extends ItemV3 {
+    ...
+    public void accept(Visitor visitor) {
+        visitor.accept(this);
+    }
+}
+
+@Entity
+@DiscriminatorValue("M")
+public class MovieV3 extends ItemV3 {
+    ...
+
+    public void accept(Visitor visitor) {
+        visitor.visit(this);
+    }
+}
+~~~
+
+직접 사용은 아래와 같이 한다.
+
+~~~java
+@Test
+@Transactional
+void inheritance5() {
+    ...
+
+    OrderItemV3 orderItem = orderItemRepositoryV3.findById(saveOrderItem.getId()).get();
+    ItemV3 item = orderItem.getItem(); // lazy load
+    item.accept(new VisitorImpl1());
+}
+~~~
