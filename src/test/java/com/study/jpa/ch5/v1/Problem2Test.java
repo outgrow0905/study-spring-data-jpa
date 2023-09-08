@@ -53,6 +53,9 @@ class Problem2Test {
         GOrderV1 order4 = new GOrderV1();
         order4.setMember(member2);
         gOrderRepositoryV1.save(order4);
+
+        entityManager.flush(); // db 반영
+        entityManager.clear(); // 영속성 컨텍스트 clear
     }
 
     @AfterEach
@@ -65,9 +68,6 @@ class Problem2Test {
     @Test
     @Transactional
     void problem1() {
-        entityManager.flush();
-        entityManager.clear();
-
         List<GMemberV1> members = gMemberRepositoryV1.findMembers();
         members.forEach(member -> {
             List<GOrderV1> orders = member.getOrders();

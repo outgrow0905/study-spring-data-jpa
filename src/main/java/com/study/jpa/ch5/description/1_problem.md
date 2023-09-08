@@ -105,3 +105,112 @@ void problem1() {
 `특정 엔티티`로부터 `연관 엔티티`를 조회하지 않는 로직이면 `지연로딩`을 사용하면 되고,  
 `연관 엔티티`를 조회해야하는 로직이면 `fetch`를 사용한 jpql을 사용하면 된다.  
 `같은 엔티티`의 조회이지만 `2개의 메서드`가 있는것이 껄끄럽지만 성능최적화를 위해 감수할만한 상황이 있을 것이다.  
+
+
+
+
+#### 읽기전용 쿼리의 성능 최적화
+엔티티를 영속성 컨텍스트에서 관리한다는것은 여러가지 이점이 있다.  
+`1차 캐시기능`을 하여 실제 데이터베이스와의 통신 횟수를 줄여 성능상 이점을 얻을 수도 있고,   
+`변경감지기능`을 통해 손쉽게 엔티티 변경을 할 수도 있다.  
+
+그러나 이것의 또 다른 의미는 영속성 컨텍스트가 메모리에 계속해서 올라가있다는 것이다.   
+실제 어플리케이션에서는 수백, 수천의 엔티티가 여러 쓰레드에서 생기고 사라지기를 반복하면서 관리될 것이다.    
+만약 빈번하게 호출되는 로직중 하나가 수만개의 엔티티를 조회한다면 메모리관리에 굉장한 부담이 될 수 있다.  
+
+또한, 실제로 영속성 컨텍스트에는 엔티티의 값만 관리되는 것이 아니다.  
+`변경감지기능`이란 엔티티의 스냅샷을 저장해두고 변경데이터를 계속해서 비교한다는 것이다.  
+이것의 의미는 스냅샷도 계속 관리하는 부담이 있다는 것이다.   
+
+많은 수의 엔티티를 조회하는 로직이 조회의 기능만 필요하고 수정로직이 없다면 엔티티조회를 `읽기전용`으로하여 성능을 최적화해볼 수 있다.      
+`읽기전용`으로 설정하면 어떤 이점이 있는지도 아래에서 살펴보자.
+
+아래의 jpql문을 최적화해보자.  
+
+~~~sql
+select m from GMemberV1 m
+~~~
+
+##### 스칼라 타입으로 조회 
+아래와 같이 스칼라 타입으로 변경한다면 영속성컨텍스트에 등록되지 않을 것이다.  
+하지만 리턴타입을 `Object[]`으로 받아야한다.    
+컨버터를 사용하여 한번 더 변환을 해주어야하는 번거로움은 있을 것이다.  
+~~~java
+@Query("select m.id, m.name, m.address from GMemberV1 m")
+List<Object[]> findMembersByColumns();
+~~~
+
+##### 스프링 @Transactional(readOnly = true) 사용
+스프링 readOnly를 사용하면 jpa에서는 어떻게 동작할까?    
+메모리부담을 덜어줄 수 있을까?    
+
+결론적으로는 아래와 같은 논리에 의해 메모리부담이 적어진다.  
+~~~
+- 엔티티의 스냅샷은 결국 엔티티의 변경사항을 추출하기위한 용도이다.  
+- 변경사항을 추출하는 목적은 데이터베이스의 변경사항을 반영하기 위함이다.  
+- readOnly는 데이터에 변경사항을 반영할 필요가 없다.  
+- 따라서 스냅샷을 저장하지 않아도 된다.
+- 스냅샷을 저장하지 않으니 메모리부담이 적어진다.   
+~~~
+
+이를 코드로 확인해보자.
+
+~~~java
+@Test
+@Transactional
+//    @Transactional(readOnly = true)
+void problem1() {
+    SharedSessionContractImplementor sharedSessionContractImplementor = entityManager.unwrap(SharedSessionContractImplementor.class);
+    log.info("FlushMode: {}", sharedSessionContractImplementor.getHibernateFlushMode());
+
+    org.hibernate.engine.spi.PersistenceContext persistenceContext = sharedSessionContractImplementor.getPersistenceContext();
+    List<GMemberV1> members = gMemberRepositoryV1.findMembersByColumns();
+    log.info("isLoaded: {}", entityManager.getEntityManagerFactory().getPersistenceUnitUtil().isLoaded(members));
+    
+    members.forEach(member -> {
+        EntityEntry entity = persistenceContext.getEntry(member);
+
+        // check snapshot 1
+        Object[] states = entity.getLoadedState();
+        if (states != null) {
+            Arrays.stream(states).forEach(o -> log.info("Snapshot1: {}", o));
+        } else {
+            log.info("SnapShop1: {}", states);
+        }
+
+        // update
+        member.setName("name1");
+        member.setAddress("address1");
+
+        // flush
+        entityManager.flush();
+
+        // check snapshot 2
+        states = entity.getLoadedState();
+        if (states != null) {
+            Arrays.stream(states).forEach(o -> log.info("Snapshot2: {}", o));
+        } else {
+            log.info("SnapShop2: {}", states);
+        }
+    });
+}
+~~~
+
+![readonly1](img/readonly1.png)
+
+첫번쨰 볼 부분은 `FlushMode=AUTO`이다. 이는 트렌젝션이 끝날때에 혹은 강제로 `flush()`가 호출될때에 `flush()`가 호출되는 정책이다.  
+두 번째는 `isLoaded=true`이다. 지금은 `readOnly` 설정이 안되어서 당연히 영속성 컨텍스트에 등록되는것이 맞지만 아래에서 `readOnly` 설정을 했을때에 바뀌는지도 주목해보자.  
+그리고 최초로 불러온 `name`과 `address`가 비어있는 `member` 엔티티의 스냅샷을 저장하는 것을 볼 수 있고,  
+값을 변경했을 때에 `update`문이 호출되고(정확하게는 쓰기지연 저장소에 저장되고) 스냅샷의 정보도 변경되는것을 같이 확인할 수 있다.  
+
+이제 `readOnly`를 켜고 다시 수행해보자.  
+
+![readonly2](img/readonly2.png) 
+
+`FlushMode=MANUAL`로 바뀌었다. 이는 강제로 `flush()`가 호출되지 않는이상 `flush()`는 트렌젝션이 끝나더라도 자동으로 수행되지 않는 정책이다.  
+이는 트렌젝션 내에서 엔티티의 정보를 변경해도 나중에 `flush()`가 호출되지 않기 때문에 안전하게 하기도 한다.  
+그리고 `flush()`를 강제로 호출한다 하더라도 아예 처음부터 스냅샷을 저장하지 않기 때문에 `flush()`를 한다해도 변경사항을 반영할 것이 없는 상태이다.  
+
+`isLoaded`는 `readOnly`여부와 관계없이 영속성 컨텍스트에 등록은 하는것을 보여준다.  
+이 의미는 나중에 알아보자.
+

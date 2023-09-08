@@ -9,4 +9,8 @@ import java.util.List;
 public interface GMemberRepositoryV1 extends JpaRepository<GMemberV1, Long> {
     @Query("select m from GMemberV1 m")
     List<GMemberV1> findMembers();
+
+//    @Query("select new GMemberV1(m.id) from GMemberV1 m")
+    @Query("select m from GMemberV1 m")
+    List<GMemberV1> findMembersByColumns();
 }
