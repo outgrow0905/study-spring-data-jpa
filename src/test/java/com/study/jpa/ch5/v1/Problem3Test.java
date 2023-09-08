@@ -4,8 +4,12 @@ import com.study.jpa.ch5.v2.enitty.GMemberV1;
 import com.study.jpa.ch5.v2.repository.GMemberRepositoryV1;
 import com.study.jpa.ch5.v2.repository.GOrderRepositoryV1;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.SessionFactory;
+import org.hibernate.StatelessSession;
+import org.hibernate.Transaction;
 import org.hibernate.engine.spi.EntityEntry;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.junit.jupiter.api.Test;
@@ -37,7 +41,9 @@ class Problem3Test {
 
         org.hibernate.engine.spi.PersistenceContext persistenceContext = sharedSessionContractImplementor.getPersistenceContext();
         List<GMemberV1> members = gMemberRepositoryV1.findMembersByColumns();
-        log.info("isLoaded: {}", entityManager.getEntityManagerFactory().getPersistenceUnitUtil().isLoaded(members));
+        for(GMemberV1 member : members) {
+            log.info("isLoaded: {}", entityManager.contains(member));
+        }
 
         members.forEach(member -> {
             EntityEntry entity = persistenceContext.getEntry(member);
@@ -65,5 +71,24 @@ class Problem3Test {
                 log.info("SnapShop2: {}", states);
             }
         });
+    }
+
+    @Test
+    @Transactional
+    void problem2() {
+        EntityManagerFactory factory = entityManager.getEntityManagerFactory();
+        SessionFactory sf = factory.unwrap(SessionFactory.class);
+        StatelessSession statelessSession = sf.openStatelessSession();
+        Transaction transaction = statelessSession.getTransaction();
+        transaction.begin();
+
+        // logic
+        List<GMemberV1> members = statelessSession.createQuery("select m from GMemberV1 m", GMemberV1.class).getResultList();
+
+        for(GMemberV1 member : members) {
+            log.info("isLoaded: {}", entityManager.contains(member)); // persistence context 에 엔티티 등록하지 않음
+        }
+
+        transaction.commit();
     }
 }

@@ -165,7 +165,9 @@ void problem1() {
 
     org.hibernate.engine.spi.PersistenceContext persistenceContext = sharedSessionContractImplementor.getPersistenceContext();
     List<GMemberV1> members = gMemberRepositoryV1.findMembersByColumns();
-    log.info("isLoaded: {}", entityManager.getEntityManagerFactory().getPersistenceUnitUtil().isLoaded(members));
+    for(GMemberV1 member : members) {
+        log.info("isLoaded: {}", entityManager.contains(member));
+    }
     
     members.forEach(member -> {
         EntityEntry entity = persistenceContext.getEntry(member);
