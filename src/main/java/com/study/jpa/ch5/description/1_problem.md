@@ -92,7 +92,7 @@ void problem1() {
 똑같은 수의 쿼리가 수행되나(`N+1` 문제가 그대로 유지되지만) 그래도 이 상황은 `즉시로딩` 상황보다는 낫다고 생각한다.    
 적어도 개발자가 `N+1` 문제가 발생할 것이라고 생각할 가능성이 높기 때문이다.  
 
-#### 해결방안
+#### 해결방안1
 `N+1 문제`가 발생했다고 어떻게 기술적으로 해결할 지 생각하기보다는,  
 `특정 엔티티(1)`로부터 `연관 엔티티(N)`의 조회로직이 얼마나 빈번하게 발생하는지 생각해보라.  
 `특정 엔티티`로부터 `연관 엔티티`를 매번 조회해야 한다면 그냥 `즉시로딩`을 설정하면 된다.   
@@ -107,6 +107,64 @@ void problem1() {
 `같은 엔티티`의 조회이지만 `2개의 메서드`가 있는것이 껄끄럽지만 성능최적화를 위해 감수할만한 상황이 있을 것이다.  
 
 
+
+#### 해결방안2
+목적에 따라 `지연로딩, 즉시로딩` 두 가지 메서드를 운영하는게 번거롭다면, `@BatchSize` 어노테이션을 사용해볼 수 있다.  
+아래와 같이 `지연로딩`이 설정되어 있는 부분에 `@BatchSize`를 걸어보자.  
+`회원`의 데이터가 `100`개가 들어있다고 가정하고, 이 어노테이션이 없는채로 `회원엔티티`를 전체조회하고 `주문엔티티`를 하나씩 탐색한다면   
+총 `101`개의 `select`가 발생할 것이다. (아래의 테스트코드 참조)
+
+~~~java
+@Entity
+public class GMemberV2 {
+    ...
+    
+    @OneToMany(mappedBy = "member")
+    @BatchSize(size = 30)
+    private List<GOrderV2> orders;
+}
+~~~
+
+해당 어노테이션을 설정하고 아래의 테스트코드를 수행하고 로그를 살펴보자.
+
+~~~java
+// repository
+public interface GMemberRepositoryV2 extends JpaRepository<GMemberV2, Long> {
+    @Query("select m from GMemberV2 m")
+    List<GMemberV2> findMembers();
+}
+
+// 테스트 코드
+@Test
+@Transactional
+void problem1() {
+    List<GMemberV2> members = gMemberRepositoryV2.findMembers();
+    log.info("members: {}", members);
+
+    for (GMemberV2 member : members) {
+        List<GOrderV2> orders = member.getOrders();
+        log.info("size: {}", orders.size());
+    }
+}
+~~~
+
+로그는 아래와 같다.
+
+![batchsize1](img/batchsize1.png)
+![batchsize2](img/batchsize2.png)
+![batchsize3](img/batchsize3.png)
+![batchsize4](img/batchsize4.png)
+
+`100`개의 데이터를 `30`개씩 조회하였으니 총 `4`번의 쿼리가 수행되는것이 이해가 된다.  
+그래도 마지막 수행된 쿼리는 주목할 필요가 있다.  
+`IN`절에 주문 엔티티의 `10`개의 키값과 `NULL 20`개가 들어있기 때문이다.
+
+이유는 `prepared statement` 재활용에 있다.  
+만약 `IN` 절에 깔끔하게 남은 `10`개의 키값만 들어있으면 `IN`에 `10`개의 키값이 들어가는 `prepared statement`를 보관해야 한다.  
+만약 데이터가 `95`개였다면 `IN`절에 `5`개의 키값이 들어가는 `prepared statement`를 보관해야 했을 것이다.  
+그렇다면 결과적으로 `30`개의 `prepared statement`를 보관해야 한다.  
+만약 `@BatchSize(size = 1000)`라면 `1000`개의 `prepared statement`를 보관해야 했을 것이다.  
+이러한 전략보다는 차라리 `NULL`을 채워서 하나의 `prepared statement`만 관리하도록하는 hibernate의 전략이다.   
 
 
 #### 읽기전용 쿼리의 성능 최적화
