@@ -83,7 +83,7 @@ class Problem3Test {
         transaction.begin();
 
         // logic
-        List<GMemberV1> members = statelessSession.createQuery("select m from GMemberV1 m", GMemberV1.class).getResultList();
+        List<GMemberV1> members = statelessSession.createQuery("select m from HMemberV1 m", GMemberV1.class).getResultList();
 
         for(GMemberV1 member : members) {
             log.info("isLoaded: {}", entityManager.contains(member)); // persistence context 에 엔티티 등록하지 않음
