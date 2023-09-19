@@ -72,3 +72,40 @@ void lock2() throws Exception {
 같은 `findById()`이지만 다른 결과값을 아래 로그에서 확인할 수 있다.
 
 ![lock2](img/lock2.png)
+
+
+
+#### LockModeType.READ
+`NON-REPEATABLE READ`을 방지할 수 있는 방법은 `LockModeType.READ` 으로 설정하는 것이다.  
+(`LockModeType.OPTIMISTIC` 과는 완전 동일한 설정이다.)
+해당 설정을 적용하면 단순 조회만 하더라도 트렌젝션이 끝날때까지 같은 `version` 임을 보장한다.  
+따라서 `@Lock` 설정을 하기 위해서는 반드시 `@Version` 어노테이션을 붙일 변수가 존재해야 한다.    
+만약 해당 변수가 없다면 아래와 같은 오류가 발생한다.
+
+~~~
+org.springframework.orm.jpa.JpaSystemException: Unable to perform beforeTransactionCompletion callback: Cannot invoke "Object.equals(Object)" because the return value of "org.hibernate.engine.spi.EntityEntry.getVersion()" is null
+~~~
+
+`LockModeType.READ`으로 `NON-REPEATABLE READ`가 방지되었는지 아래 테스트코드를 통해 확인해보자.
+
+~~~java
+@Test
+@Transactional(isolation = Isolation.READ_COMMITTED)
+void lock3() throws Exception {
+    HMemberV1 member = hMemberRepositoryV1.findMemberById(1L);
+    log.info("member: {}", member);
+
+    // update on query browser
+    Thread.sleep(10000);
+}
+~~~
+
+아래의 로그를 보면 `select`가 두번 수행된다.
+
+![lock3](img/lock3.png)
+
+그리고 아래와 같은 친절한 오류발생 메시지와 함께 데이터베이스에 새로운 `version`이 존재한다는 오류를 던져주고 있다. 
+
+~~~
+org.springframework.orm.ObjectOptimisticLockingFailureException: Newer version [3] of entity [[com.study.jpa.ch6.v1.enitty.HMemberV1#1]] found in database
+~~~

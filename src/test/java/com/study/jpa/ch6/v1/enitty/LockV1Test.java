@@ -49,4 +49,14 @@ class LockV1Test {
         member = hMemberRepositoryV1.findById(1L).get();
         log.info("member: {}", member);
     }
+
+    @Test
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    void lock3() throws Exception {
+        HMemberV1 member = hMemberRepositoryV1.findMemberById(1L);
+        log.info("member: {}", member);
+
+        // update on query browser
+        Thread.sleep(10000);
+    }
 }
