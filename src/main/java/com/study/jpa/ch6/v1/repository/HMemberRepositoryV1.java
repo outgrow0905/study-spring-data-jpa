@@ -12,6 +12,6 @@ public interface HMemberRepositoryV1 extends JpaRepository<HMemberV1, Long> {
     @Query("select m from HMemberV1 m")
     List<HMemberV1> findMembers();
 
-    @Lock(LockModeType.READ)
+    @Lock(LockModeType.OPTIMISTIC)
     HMemberV1 findMemberById(Long id);
 }

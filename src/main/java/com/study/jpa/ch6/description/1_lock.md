@@ -75,9 +75,17 @@ void lock2() throws Exception {
 
 
 
-#### LockModeType.READ
-`NON-REPEATABLE READ`을 방지할 수 있는 방법은 `LockModeType.READ` 으로 설정하는 것이다.  
-(`LockModeType.OPTIMISTIC` 과는 완전 동일한 설정이다.)
+#### LockModeType.OPTIMISTIC
+`NON-REPEATABLE READ`을 방지할 수 있는 방법은 `LockModeType.OPTIMISTIC` 으로 설정하는 것이다.  
+(`LockModeType.READ` 과는 완전 동일한 설정이다.)
+
+설정은 아래와 같이 하면 된다.
+
+~~~java
+@Lock(LockModeType.OPTIMISTIC)
+HMemberV1 findMemberById(Long id);
+~~~
+
 해당 설정을 적용하면 단순 조회만 하더라도 트렌젝션이 끝날때까지 같은 `version` 임을 보장한다.  
 따라서 `@Lock` 설정을 하기 위해서는 반드시 `@Version` 어노테이션을 붙일 변수가 존재해야 한다.    
 만약 해당 변수가 없다면 아래와 같은 오류가 발생한다.
@@ -86,7 +94,7 @@ void lock2() throws Exception {
 org.springframework.orm.jpa.JpaSystemException: Unable to perform beforeTransactionCompletion callback: Cannot invoke "Object.equals(Object)" because the return value of "org.hibernate.engine.spi.EntityEntry.getVersion()" is null
 ~~~
 
-`LockModeType.READ`으로 `NON-REPEATABLE READ`가 방지되었는지 아래 테스트코드를 통해 확인해보자.
+`LockModeType.OPTIMISTIC`으로 `NON-REPEATABLE READ`가 방지되었는지 아래 테스트코드를 통해 확인해보자.
 
 ~~~java
 @Test
@@ -109,3 +117,82 @@ void lock3() throws Exception {
 ~~~
 org.springframework.orm.ObjectOptimisticLockingFailureException: Newer version [3] of entity [[com.study.jpa.ch6.v1.enitty.HMemberV1#1]] found in database
 ~~~
+
+
+#### LockModeType.OPTIMISTIC_FORCE_INCREMENT
+`LockModeType.OPTIMISTIC_FORCE_INCREMENT`은 단순 조회만 하더라도 `version`을 `1` 증가시킨다.  
+어떨 때 사용하는지 알아보자.
+
+~~~java
+@Entity
+public class ABoard {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "BOARD_NO")
+    private Long id;
+
+    private String title;
+
+    @OneToMany(mappedBy = "board", cascade = CascadeType.PERSIST)
+    List<AReply> replies;
+
+    @Version
+    private Integer version;
+}
+
+@Entity
+public class AReply {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "REPLY_NO")
+    private Long id;
+
+    private String text;
+
+    @JoinColumn(name = "BOARD_NO")
+    @ManyToOne
+    private ABoard board;
+}
+
+public interface ABoardRepositoryV1 extends JpaRepository<ABoard, Long> {
+    @Lock(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
+    ABoard findABoardById(Long id);
+}
+~~~
+
+위의 `게시글`과 `댓글`의 관계는 `1:N`의 관계이다.  
+두 개의 동시요청에서 댓글을 작성한다고 가정해보자.  
+`게시글`을 변경하는 것이 아니니, `LockModeType.OPTIMISTIC` 옵션이었다면 둘 다 `댓글`이 정상적으로 추가되었을 것이다.  
+
+`LockModeType.OPTIMISTIC_FORCE_INCREMENT` 옵션은 단순 조회만 하더라도 `version`을 증가시킨다고 하였다.  
+위의 예시에서는 `게시글`의 `댓글`만 추가해도 `version`이 증가될 것이다.  
+실제 `게시글`의 성격은 변한것이 없지만 관련 엔티티의 변경으로 `version`이 증가되는 것이다.  
+만약 두 개의 동시요청이 댓글을 추가하려고 한다면 하나는 실패하게 될 것이다.  
+둘 중 하나는 `게시글`의 `version`을 확인할때에 실패할 것이기 때문이다.  
+
+테스트코드를 작성하고 확인해보자.  
+
+~~~java
+@Test
+@Transactional(isolation = Isolation.READ_COMMITTED)
+void lock1() throws Exception {
+    // board
+    ABoard board1 = aBoardRepositoryV1.findABoardById(1L);
+
+    // reply
+    AReply reply = new AReply();
+    reply.setText("text3");
+    reply.setBoard(board1);
+
+    // add reply
+    board1.getReplies().add(reply);
+}
+~~~
+
+![lock4](img/lock4.png)
+
+일반적으로 `댓글`은 동시에 추가되어도 반영되어야 하기 때문에 위와같은 설정을 하지는 않을 것이다.  
+하지만, 분명히 필요한 서비스가 있을 것이고 그럴 때에 유용하게 사용하면 된다.
+
+
+
