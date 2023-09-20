@@ -43,7 +43,7 @@ void lock1() throws Exception {
 `commit`을 하기 전에 `version`이 `8`이 맞는지 확인하는 것이다.  
 그리고 해당 데이터가 다른 쓰레드에 의해 `8`에서 `9`값으로 증가되었기 때문에 그 아래에 `ObjectOptimisticLockingFailureException` 오류가 발생했다.  
 이렇게 동작한다면 위에서 예시로 든 `두 번의 인출문제`를 해결 할 수 있다.  
-동시에 같은 `versino`을 조회했어도 먼저 `commit` 한 것이 반영되고, 다른 하나는 실패하는 전략이다.  
+동시에 같은 `version`을 조회했어도 먼저 `commit` 한 것이 반영되고, 다른 하나는 실패하는 전략이다.  
 
 또한 이 정도의 락 설정은 `NON-REPEATABLE READ`가 발생하는것도 알고 있어야 한다. (락 수준이 높다고 좋은것은 아니다. 개발자의 의도대로 작동하면 된다.)  
 한 트렌젝션 내에서 같은 읽기의 결과값이 다를 수 있는 것이다.  
@@ -196,3 +196,21 @@ void lock1() throws Exception {
 
 
 
+#### LockModeType.PESSIMISTIC_WRITE
+위에서 진행한 여러가지 해결방법들은 데이터베이스의 기능을 이용하는 것이 아니라 jpa에서 논리적으로 해결한 것이다.  
+`version` 컬럼을 이용하여 트렌젝션이 끝나기 전에 변경사항을 체크하던지, 데이터 조회 혹은 변경시 `version`을 올리는 방식 등이 있었다.  
+`LockModeType.PESSIMISTIC_WRITE`은 데이터베이스의 기능을 사용한다.    
+`LockModeType.PESSIMISTIC_READ, LockModeType.PESSIMISTIC_FORCE_INCREMENT`도 있지만 잘 사용하지 않고 데이터베이스에서 지원하지 않는 경우도 있으니 필요시에 따로 보자.  
+
+`LockModeType.PESSIMISTIC_WRITE`은 `select for update`을 사용하여 해결한다.   
+`select for update`으로 `X_LOCK`을 설정하니 다른 트렌젝션에서는 해당 범위의 데이터를 수정할 수 없다.    
+당연히 `NON-REPEATABLE READ`도 발생할 수 없다.
+
+
+
+#### Reference
+- https://www.baeldung.com/jpa-pessimistic-locking
+- https://www.geeksforgeeks.org/difference-between-shared-lock-and-exclusive-lock/
+- https://github.com/eugenp/tutorials/tree/master/persistence-modules/hibernate-jpa/src/test/java/com/baeldung/hibernate/pessimisticlocking
+- https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-transaction-model.html
+- https://tecoble.techcourse.co.kr/post/2022-11-07-mysql-isolation/
